@@ -1,14 +1,16 @@
-@static if is_windows()
+@static if Sys.iswindows()
     using WinRPM
 end
+
+using Libdl
 
 function copy_libs(src, dst)
     files = readdir(src)
 
     for i = 1:length(files)
         file = files[i]
-        if ismatch(r"\w*?-\w*?(-.)?.(so|dylib|dll)$", file)
-            cp("$src/$file", "$dst/$file", follow_symlinks=true, remove_destination=true)
+        if occursin(r"\w*?-\w*?(-.)?.(so|dylib|dll)$", file)
+            cp("$src/$file", "$dst/$file", follow_symlinks=true, force=true)
         end
     end
 end
@@ -16,10 +18,9 @@ end
 function symlink_files(dir, ext)
     cd(dir)
     files = readdir(dir)
-    for i = 1:length(files)
-        file = files[i]
-        filename = file[1:search(file, '.') - 1]
-        if ismatch(r"\w*?-\w*?.(so|dylib|dll)$", file)
+    for file in files
+        filename = file[1:findfirst(isequal('.'), file) - 1]
+        if occursin(r"\w*?-\w*?.(so|dylib|dll)$", file)
             run(`ln -sf $filename.$ext $file`)
         end
     end
@@ -33,10 +34,13 @@ end
 
 deps = dirname(@__FILE__)
 cd(deps)
+const SFML_VERSION="2.5.1"
+const CSFML_VERSION="2.0"
+const LIB_VERSION="2"
 
-@static if is_apple()
-    sfml = "http://www.sfml-dev.org/files/SFML-2.2-osx-clang-universal.tar.gz"
-    csfml = "http://www.sfml-dev.org/files/CSFML-2.2-osx-clang-universal.tar.gz"
+@static if Sys.isapple()
+    sfml = "http://www.sfml-dev.org/files/SFML-$(SFML_VERSION)-osx-clang-universal.tar.gz"
+    csfml = "http://www.sfml-dev.org/files/CSFML-$(SFML_VERSION)-osx-clang-universal.tar.gz"
 
     if !isfile("sfml.tar.gz")
         println("Downloading SFML...")
@@ -53,35 +57,35 @@ cd(deps)
     mkdir_if_necessary("csfml")
     run(`tar -xzf csfml.tar.gz -C csfml --strip-components=1`)
 
-    symlink_files("$deps/csfml/lib", "2.2.0.dylib")
+    symlink_files("$deps/csfml/lib", "$(LIB_VERSION).0.dylib")
 
     copy_libs("$deps/sfml/lib", deps)
     copy_libs("$deps/csfml/lib", deps)
 
-    cp("$deps/sfml/extlibs/freetype.framework", "$deps/freetype.framework", remove_destination=true)
-    cp("$deps/sfml/extlibs/sndfile.framework", "$deps/sndfile.framework", remove_destination=true)
+    cp("$deps/sfml/extlibs/freetype.framework", "$deps/freetype.framework", force=true)
+    cp("$deps/sfml/extlibs/sndfile.framework", "$deps/sndfile.framework", force=true)
 
     cd(deps)
     modules = ["system", "network", "audio", "window", "graphics"]
     for i = 1:length(modules)
-        run(`ln -sf libcsfml-$(modules[i]).dylib libcsfml-$(modules[i]).2.2.dylib`)
+        run(`ln -sf libcsfml-$(modules[i]).dylib libcsfml-$(modules[i]).$(SFML_VERSION).dylib`)
     end
 end
 
-@static if is_linux()
+@static if Sys.islinux()
 
     modules = ["system", "network", "audio", "window", "graphics"]
 
     # check if SFML is installed in the system
     useSystemSFML = false
-    systemLibPath = "/usr/lib"
-    if isfile("$(systemLibPath)/libcsfml-system.so")
+
+    if !isempty(Libdl.find_library("libcsfml-system"))
         useSystemSFML = true
     end
 
     if !useSystemSFML  # get our own, but may not work on some platforms [deps]
-        sfml = "http://www.sfml-dev.org/files/SFML-2.2-linux-gcc-$(Sys.WORD_SIZE)-bit.tar.gz"
-        csfml = "http://www.sfml-dev.org/files/CSFML-2.2-linux-gcc-$(Sys.WORD_SIZE)-bit.tar.bz2"
+        sfml = "http://www.sfml-dev.org/files/SFML-$(SFML_VERSION)-linux-gcc-$(Sys.WORD_SIZE)-bit.tar.gz"
+        csfml = "http://www.sfml-dev.org/files/CSFML-$(CSFML_VERSION)-linux-gcc-$(Sys.WORD_SIZE)bits.tar.bz2"
 
         if !isfile("sfml.tar.gz")
             println("Downloading SFML...")
@@ -98,26 +102,27 @@ end
         mkdir_if_necessary("csfml")
         run(`tar -xjf csfml.tar.bz2 -C csfml --strip-components=1`)
 
-        symlink_files("$deps/csfml/lib", "so.2.2.0")
+        symlink_files("$deps/csfml/lib", "so.$(LIB_VERSION)")
 
         copy_libs("$deps/sfml/lib", deps)
         copy_libs("$deps/csfml/lib", deps)
 
         cd(deps)
         for i = 1:length(modules)
-            run(`ln -sf libcsfml-$(modules[i]).so libcsfml-$(modules[i]).so.2.2`)
+            run(`ln -sf libcsfml-$(modules[i]).so libcsfml-$(modules[i]).so.$(LIB_VERSION)`)
+            run(`ln -sf libsfml-$(modules[i]).so libsfml-$(modules[i]).so.$(LIB_VERSION)`)
         end
     else
         # use system SFML/CSFML
-        for i = 1:length(modules)
-            cd(deps)
-            run(`ln -sf $(systemLibPath)/libcsfml-$(modules[i]).so libcsfml-$(modules[i]).so.2.2`)
-            run(`ln -sf $(systemLibPath)/libsfml-$(modules[i]).so libsfml-$(modules[i]).so`)
-        end
+        # for i = 1:length(modules)
+        #     cd(deps)
+        #     run(`ln -sf $(systemLibPath)/libcsfml-$(modules[i]).so libcsfml-$(modules[i]).so.$(LIB_VERSION)`)
+        #     run(`ln -sf $(systemLibPath)/libsfml-$(modules[i]).so libsfml-$(modules[i]).so`)
+        # end
     end
 end
 
-@static if is_windows()
+@static if Sys.iswindows()
     GCCPath = Pkg.dir("WinRPM","deps","usr","$(Sys.ARCH)-w64-mingw32","sys-root","mingw","bin","gcc.exe")
     if !isfile(GCCPath)
         println("Installing gcc...")
@@ -145,15 +150,14 @@ end
 end
 
 cd(joinpath(dirname(@__FILE__),"..","src","c"))
-julia_exe = joinpath(JULIA_HOME, Base.julia_exename())
-run(`$(julia_exe) createlib.jl`)
-
+include(joinpath("..", "src", "c", "createlib.jl"))
+createlib()
 cd(deps)
 
-if isfile("sfml")
+if isfile("sfml") || isdir("sfml")
     rm("sfml", recursive=true)
 end
-if isfile("csfml")
+if isfile("csfml") || isdir("csfml")
     rm("csfml", recursive=true)
 end
 

@@ -1,19 +1,19 @@
-immutable Vector3f
+struct Vector3f
     x::Cfloat
     y::Cfloat
     z::Cfloat
 end
 
 abstract type Vector2 end
-immutable Vector2i <: Vector2
+struct Vector2i <: Vector2
     x::Cint
     y::Cint
 end
-immutable Vector2u <: Vector2
+struct Vector2u <: Vector2
     x::UInt32
     y::UInt32
 end
-immutable Vector2f <: Vector2
+struct Vector2f <: Vector2
     x::Cfloat
     y::Cfloat
 end
@@ -77,28 +77,29 @@ function /(vec1::Vector2, vec2::Vector2)
     Vector2(vec1.x / vec2.x, vec1.y / vec2.y)
 end
 
-Base.contains(obj, v::Vector2) = contains(obj, v.x, v.y)
+contains(obj, v::Vector2) = contains(obj, v.x, v.y)
 
-import Base.eltype
-function eltype{T <: Vector2}(::Type{T})
+function eltype(::Type{T}) where {T <: Vector2}
     @assert isleaftype(T)
     typeof(T(0,0).x)
 end
 eltype(v::Vector2) = eltype(typeof(v))
 
-import Base.*
 *(s::Number, v::Vector2) = Vector2(s*v.x, s*v.y)
 *(v::Vector2, s::Number) = s*v
 
-import Base.==
 ==(v::Vector2, w::Vector2) = (v.x == w.x) & (v.y == w.y)
 
-import Base.convert
-convert{V <: Vector2}(::Type{V}, v::Vector2) = V(v.x, v.y)
+convert(::Type{V}, v::Vector2) where {V <: Vector2} = V(v.x, v.y)
 
-Base.start(v::Vector2) = 1
-Base.next(v::Vector2, i) = (v[i], i+1)
-Base.done(v::Vector2, i) = i > 2
+function Base.iterate(v::Vector2, state=1)
+    if state > 2
+        nothing
+    else
+        (v[state], state+1)
+    end
+end
+
 function Base.getindex(v::Vector2, i)
     if i == 1
         return v.x

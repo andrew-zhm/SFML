@@ -4,14 +4,16 @@ VERSION >= v"0.4.0-dev+6521" && __precompile__()
 
 using Compat
 
-import Base: display, isopen, close, reset, copy, launch, start, listen,
-       accept, connect, write, send, bind, download, contains,
-       +, -, *, /
+# import Base: display, isopen, close, reset, copy, launch, start, listen,
+#        accept, connect, write, send, bind, download, contains,
+#     +, -, *, /
+
+using Libdl
 
 function check_deps(ldd_result)
     i = 0
     for line in split(ldd_result, "\n")
-        if contains(line, "not found") && !contains(line, "libsfml")
+        if occursin(line, "not found") && !occursin(line, "libsfml")
             i += 1
             if i == 1
                 println("Could not resolve dependencies:")
@@ -21,61 +23,66 @@ function check_deps(ldd_result)
     end
 end
 
+const deps = joinpath(dirname(@__FILE__),"..","deps")
+
+@compat @static if Sys.isunix()
+    const libcsfml_system = "libcsfml-system"
+    const libcsfml_audio = "libcsfml-audio"
+    const libcsfml_network = "libcsfml-network"
+    const libcsfml_window = "libcsfml-window"
+    const libcsfml_graphics = "libcsfml-graphics"
+end
+
+@compat @static if Sys.iswindows()
+    const libcsfml_system = "csfml-system-2"
+    const libcsfml_audio = "csfml-audio-2"
+    const libcsfml_network = "csfml-network-2"
+    const libcsfml_window = "csfml-window-2"
+    const libcsfml_graphics = "csfml-graphics-2"
+end
+
+const libjuliasfml = "libjuliasfml"
+
 function __init__()
     old = pwd()
-    deps = joinpath(dirname(@__FILE__),"..","deps")
     push!(Libdl.DL_LOAD_PATH, deps)
-    try
-        @compat @static if is_unix()
+     try
+        @compat @static if Sys.isunix()
             cd(deps)
-            @compat @static if is_apple()
+            @compat @static if Sys.isapple()
                 Libdl.dlopen("freetype.framework/freetype")
                 Libdl.dlopen("sndfile.framework/sndfile")
             end
 
-            @compat @static if is_linux()
-                system_deps = @compat readstring(`ldd libsfml-system.so`)
-                check_deps(system_deps)
-                network_deps = @compat readstring(`ldd libsfml-network.so`)
-                check_deps(network_deps)
-                graphics_deps = @compat readstring(`ldd libsfml-graphics.so`)
-                check_deps(graphics_deps)
-                audio_deps = @compat readstring(`ldd libsfml-audio.so`)
-                check_deps(audio_deps)
-                window_deps = @compat readstring(`ldd libsfml-window.so`)
-                check_deps(window_deps)
+            @compat @static if Sys.islinux()
+
+                if isempty(Libdl.find_library("libcsfml-system"))
+                    system_deps = @compat read(`ldd libsfml-system.so`, String)
+                    check_deps(system_deps)
+                    network_deps = @compat read(`ldd libsfml-network.so`, String)
+                    check_deps(network_deps)
+                    graphics_deps = @compat read(`ldd libsfml-graphics.so`, String)
+                    check_deps(graphics_deps)
+                    audio_deps = @compat read(`ldd libsfml-audio.so`, String)
+                    check_deps(audio_deps)
+                    window_deps = @compat read(`ldd libsfml-window.so`, String)
+                    check_deps(window_deps)
+                end
+
+                Libdl.dlopen("libsfml-system", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libsfml-network", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libsfml-audio", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libsfml-window", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libsfml-graphics", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libcsfml-system", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libcsfml-network", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libcsfml-audio", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libcsfml-window", Libdl.RTLD_GLOBAL)
+                Libdl.dlopen("libcsfml-graphics", Libdl.RTLD_GLOBAL)
             end
-
-            Libdl.dlopen("libsfml-system", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libsfml-network", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libsfml-audio", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libsfml-window", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libsfml-graphics", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libcsfml-system", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libcsfml-network", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libcsfml-audio", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libcsfml-window", Libdl.RTLD_GLOBAL)
-            Libdl.dlopen("libcsfml-graphics", Libdl.RTLD_GLOBAL)
-            global const libcsfml_system = "libcsfml-system"
-            global const libcsfml_audio = "libcsfml-audio"
-            global const libcsfml_network = "libcsfml-network"
-            global const libcsfml_window = "libcsfml-window"
-            global const libcsfml_graphics = "libcsfml-graphics"
         end
 
-        @compat @static if is_windows()
-            global const libcsfml_system = "csfml-system-2"
-            global const libcsfml_audio = "csfml-audio-2"
-            global const libcsfml_network = "csfml-network-2"
-            global const libcsfml_window = "csfml-window-2"
-            global const libcsfml_graphics = "csfml-graphics-2"
-        end
-
-        @compat @static if is_unix()
-            global const libjuliasfml_ptr = Libdl.dlopen("$deps/libjuliasfml")
-        end
-        global const libjuliasfml = "libjuliasfml"
-        cd(old)
+       cd(old)
     catch exception
         println("Something has gone wrong with the SFML installation.")
         println(exception)
@@ -173,7 +180,7 @@ end
 function make_gif(images::Array{Image}, width, height, filename="plot.gif", delay=0.06)
     println("Please wait while your gif is made... This may take awhile")
     dir = mktempdir()
-    name = filename[1:search(filename, '.')-1]
+    filename = file[1:findfirst(isequal('.'), file) - 1]
     imgsize = "$width" * "x" * "$height"
 
     for i = 1:length(images)
