@@ -39,8 +39,8 @@ const CSFML_VERSION="2.0"
 const LIB_VERSION="2"
 
 @static if Sys.isapple()
-    sfml = "http://www.sfml-dev.org/files/SFML-$(SFML_VERSION)-osx-clang-universal.tar.gz"
-    csfml = "http://www.sfml-dev.org/files/CSFML-$(SFML_VERSION)-osx-clang-universal.tar.gz"
+    sfml = "https://www.sfml-dev.org/files/SFML-2.5.1-macOS-clang.tar.gz"
+    csfml = "https://www.sfml-dev.org/files/CSFML-2.5-macOS-clang.tar.gz"
 
     if !isfile("sfml.tar.gz")
         println("Downloading SFML...")
