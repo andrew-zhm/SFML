@@ -3,7 +3,7 @@
 end
 
 using Libdl
-
+override USE_BINARYBUILDER=0
 function copy_libs(src, dst)
     files = readdir(src)
 
